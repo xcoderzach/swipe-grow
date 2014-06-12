@@ -1,0 +1,16 @@
+.thing {
+  position: absolute;
+  top: 0;
+  left: 0;
+  background-color: blue;
+  -webkit-transform-origin: left top;
+  -webkit-transform: translateZ(0) scale(1);
+}
+
+.thing:nth-child(3n + 1) {
+  background-color: green;
+}
+
+.thing:nth-child(3n + 2) {
+  background-color: red;
+}
