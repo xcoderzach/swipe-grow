@@ -12,6 +12,10 @@ var physics = require('rk4')
   , initialScale = 0.25
   , initialY = height * initialScale
   , initialX = 0
+  , lastX = 0
+  , lastY = 0
+  , lastScale = .25
+
 
 function page(axis, evt) {
   axis = axis.toUpperCase()
@@ -23,7 +27,7 @@ phys.css(function(position) {
   lastX = position.x
 
   var scale = lastScale = scaleFromY(position.y)
-  layout(position.x, scale)
+  layout(position.x, 0.25)//scale)
   return {}
 })
 
@@ -52,27 +56,29 @@ window.addEventListener(startEvent, function(evt) {
   chosenIndex = i
 })
 
-var lastX = 0
-  , lastY = 0
-  , lastScale = .25
-
 window.addEventListener(endEvent, function(evt) {
-
   mousedown = false
 
   var vel = Vector(veloX.getVelocity() || 0, veloY.getVelocity() || 0)
 
-  if(vel.y < 0)
-    phys.spring(vel, { x: lastX, y: lastY }, { x: 0, y: 0 }, { k: 20, b: 300 })
-  else
-    phys.spring(vel, { x: lastX, y: lastY }, { x: -chosenIndex * width, y: height }, { k: 20, b: 300 })
+  if(vel.x < 0) {
+    phys.decelerate(vel.x, { x: lastX, y: 0 }, { x: -(width * initialScale * els.length - width), y: 0 }, { acceleration: 1000 })
+    .then(phys.springTo({ x: -(width * initialScale * els.length - width), y: 0 }))
+  } else {
+    phys.decelerate(vel.x, { x: lastX, y: 0 }, { x: 0, y: 0 }, { acceleration: 1000 })
+    .then(phys.springTo({ x: 0, y: 0 }))
+  }
+  // if(vel.y < 0)
+  //   phys.spring(vel, { x: lastX, y: lastY }, { x: 0, y: 0 }, { k: 20, b: 300 })
+  // else
+  //   phys.spring(vel, { x: lastX, y: lastY }, { x: -chosenIndex * width, y: height }, { k: 20, b: 300 })
 })
 
 function loop() {
   requestAnimationFrame(function() {
     if(mousedown) {
       var scale = lastScale = scaleFromY(lastY)
-      layout(lastX, scale)
+      layout(lastX, 0.25)//scale)
     }
     loop()
   })
@@ -97,7 +103,7 @@ window.addEventListener(moveEvent, function(evt) {
   if(mousedown) {
     var y = lastY = page('y', evt) - fingerOffsetY
       , scale = scaleFromY(y)
-      , x = lastX = page('x', evt) - (fingerOffsetX * scale/scaleOffset)
+      , x = lastX = page('x', evt) - (fingerOffsetX)// * scale/scaleOffset)
 
     veloX.updatePosition(x)
     veloY.updatePosition(y)
