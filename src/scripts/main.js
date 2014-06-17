@@ -10,12 +10,11 @@ var physics = require('rk4')
   , height = window.innerHeight
   , width = window.innerWidth
   , initialScale = 0.25
-  , initialY = height * initialScale
+  , initialY = 0
   , initialX = 0
   , lastX = 0
   , lastY = 0
   , lastScale = .25
-
 
 function page(axis, evt) {
   axis = axis.toUpperCase()
@@ -23,89 +22,187 @@ function page(axis, evt) {
 }
 
 phys.css(function(position) {
-  lastY = position.y
   lastX = position.x
+  lastScale = position.y
 
-  var scale = lastScale = scaleFromY(position.y)
-  layout(position.x, 0.25)//scale)
   return {}
 })
 
 var fingerOffsetX, fingerOffsetY
   , chosenIndex
-
 var touchEnabled = 'ontouchstart' in document.body
 var startEvent = touchEnabled ? 'touchstart' : 'mousedown'
 var endEvent = touchEnabled ? 'touchend' : 'mouseup'
 var moveEvent = touchEnabled ? 'touchmove' : 'mousemove'
 
 var scaleOffset
+var intent
 
-window.addEventListener(startEvent, function(evt) {
+window.addEventListener(startEvent, start)
+window.addEventListener(moveEvent, determineIntent)
+window.addEventListener(endEvent, end)
+
+function start(evt) {
   phys.cancel()
   mousedown = true
   veloX = new Velocity()
   veloY = new Velocity()
 
   fingerOffsetX = page('x', evt) - lastX
-  fingerOffsetY = page('y', evt) - lastY
+  initialY = page('y', evt)
+  initialX = page('x', evt)
   scaleOffset = lastScale
+
+  veloX.updatePosition(lastX)
+  veloY.updatePosition(lastScale)
 
   var target = evt.target
   for(var i = 0 ; (target = target.previousSibling) != null ; target.nodeType === 1 && i++) {}
   chosenIndex = i
-})
 
-window.addEventListener(endEvent, function(evt) {
+  intent = null
+}
+
+function end(evt) {
+  if(intent === 'horizontal' && lastScale < .3)
+    endScroll.call(this, evt)
+  else if(intent === 'horizontal')
+    endPage.call(this, evt)
+  else
+    endZoom.call(this, evt)
+}
+
+function getAngle(x1, y1, x2, y2) {
+  return 180 + Math.atan2(y2 - y1, x1 - x2) * 180 / Math.PI
+}
+
+function acceptableAngle(axis, angle) {
+  var acceptableRange = 45
+  if(axis === 'X') {
+    return angle > 360 - acceptableRange || angle < 0 + acceptableRange ||
+           (Math.abs(angle - 180) < acceptableRange)
+  } else {
+    return (Math.abs(angle - 90) < acceptableRange) ||
+           (Math.abs(angle - 270) < acceptableRange)
+  }
+}
+
+function determineIntent(evt) {
+  if(!intent) {
+    var angle = getAngle(initialX, initialY, page('x', evt), page('y', evt))
+    intent = acceptableAngle('X', angle) ? 'horizontal' : 'vertical'
+  }
+
+  if(intent === 'horizontal' && lastScale < .3)
+    moveScroll.call(this, evt)
+  else if(intent === 'horizontal')
+    movePage.call(this, evt)
+  else
+    moveZoom.call(this, evt)
+}
+
+function moveScroll(evt) {
+  evt.preventDefault()
+  if(mousedown) {
+    var y = lastY = page('y', evt)
+      , scale = lastScale = .25
+      , x = lastX = page('x', evt) - fingerOffsetX * scale / scaleOffset
+
+    veloX.updatePosition(x)
+    veloY.updatePosition(scale)
+  }
+}
+
+function moveZoom(evt) {
+  evt.preventDefault()
+  if(mousedown) {
+    var y = lastY = page('y', evt)
+      , scale = lastScale = scaleOffset * (y / initialY)
+      , x = lastX = page('x', evt) - fingerOffsetX * scale/scaleOffset
+
+    veloX.updatePosition(x)
+    veloY.updatePosition(scale)
+  }
+}
+
+function movePage(evt) {
+  evt.preventDefault()
+  if(mousedown) {
+    var y = lastY = page('y', evt)
+      , scale = lastScale = 1
+      , x = lastX = page('x', evt) - fingerOffsetX * scale/scaleOffset
+
+    veloX.updatePosition(x)
+    veloY.updatePosition(scale)
+  }
+}
+
+var leftBoundry = {
+  x: -(width * initialScale * els.length - width),
+  y: .25
+}
+var rightBoundry = { x: 0, y: .25 }
+var springConst = { k: 100, b: 20 }
+
+
+function endPage(evt) {
+  mousedown = false
+
+  var vel = Vector(veloX.getVelocity() || 0, veloY.getVelocity() || 0)
+    , nextIndex = (vel.x < 0) ? chosenIndex + 1 : chosenIndex - 1
+
+  nextIndex = Math.min(els.length - 1, Math.max(nextIndex, 0))
+  chosenIndex = nextIndex
+
+  return phys.spring(vel.x, { x: lastX, y: 1 }, { x: -width * nextIndex , y: 1 }, springConst)
+}
+
+
+function endScroll(evt) {
   mousedown = false
 
   var vel = Vector(veloX.getVelocity() || 0, veloY.getVelocity() || 0)
 
-  if(vel.x < 0) {
-    phys.decelerate(vel.x, { x: lastX, y: 0 }, { x: -(width * initialScale * els.length - width), y: 0 }, { acceleration: 1000 })
-    .then(phys.springTo({ x: -(width * initialScale * els.length - width), y: 0 }))
-  } else {
-    phys.decelerate(vel.x, { x: lastX, y: 0 }, { x: 0, y: 0 }, { acceleration: 1000 })
-    .then(phys.springTo({ x: 0, y: 0 }))
-  }
-  // if(vel.y < 0)
-  //   phys.spring(vel, { x: lastX, y: lastY }, { x: 0, y: 0 }, { k: 20, b: 300 })
-  // else
-  //   phys.spring(vel, { x: lastX, y: lastY }, { x: -chosenIndex * width, y: height }, { k: 20, b: 300 })
-})
+  if(lastX < leftBoundry.x)
+    return phys.spring(vel.x, { x: lastX, y: .25 }, leftBoundry, springConst)
+  if(lastX > rightBoundry.x)
+    return phys.spring(vel.x, { x: lastX, y: .25 }, rightBoundry, springConst)
 
+  if(vel.x < 0) {
+    phys.decelerate(vel.x, { x: lastX, y: .25 }, leftBoundry, { acceleration: 1300 })
+    .then(phys.springTo(leftBoundry, springConst))
+  } else {
+    phys.decelerate(vel.x, { x: lastX, y: .25 }, rightBoundry, { acceleration: 1300 })
+    .then(phys.springTo(rightBoundry, springConst))
+  }
+}
+
+function endZoom(evt) {
+  mousedown = false
+
+  var vel = Vector(veloX.getVelocity() || 0, veloY.getVelocity() || 0)
+    , springConst = { k: 150, b: 20 }
+    , screenOffset = (lastX + fingerOffsetX * lastScale/scaleOffset) * .75
+    , finalX = lastX * (.25 / lastScale) + screenOffset
+  finalX = Math.min(rightBoundry.x, Math.max(finalX, leftBoundry.x))
+
+  if(vel.y < 0) {
+    return phys.spring(vel, { x: lastX, y: lastScale }, { x: finalX, y: .25 }, springConst)
+  } else {
+    return phys.spring(vel, { x: lastX, y: lastScale }, { x: -width * chosenIndex, y: 1 }, springConst)
+  }
+}
+
+var setX
+  , setScale
 function loop() {
   requestAnimationFrame(function() {
-    if(mousedown) {
-      var scale = lastScale = scaleFromY(lastY)
-      layout(lastX, 0.25)//scale)
-    }
     loop()
+    if(setX !== lastX || lastScale !== setScale) {
+      setX = lastX
+      setScale = lastScale
+      layout(lastX, lastScale)
+    }
   })
 }
-loop()
-
-function interpolator(start, end) {
-  return function(value) {
-    return (value - start) / (end - start)
-  }
-}
-
-function scaleFromY(y) {
-  var f = interpolator(0, height)
-  return 0.25 + f(y) * 0.75
-}
-
-window.interpolator = interpolator
-
-window.addEventListener(moveEvent, function(evt) {
-  evt.preventDefault()
-  if(mousedown) {
-    var y = lastY = page('y', evt) - fingerOffsetY
-      , scale = scaleFromY(y)
-      , x = lastX = page('x', evt) - (fingerOffsetX)// * scale/scaleOffset)
-
-    veloX.updatePosition(x)
-    veloY.updatePosition(y)
-  }
-})
+setTimeout(function() { loop() }, 300)

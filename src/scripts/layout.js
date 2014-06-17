@@ -25,7 +25,6 @@ els.forEach(function(el, index) {
   el.style.height = height + 'px'
 })
 
-
 function doLayout(xOffset, scale) {
   for(var i = 0 ; i < els.length ; i++) {
     els[i].style.webkitTransform = "translate3d(" + (xOffset + width * scale * i + 2) +  "px, 0, 0) scale(" + scale + ")"
