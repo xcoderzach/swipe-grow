@@ -8,6 +8,8 @@ var physics = require('rk4')
   , height = window.innerHeight
   , width = window.innerWidth
 
+document.body.scrollLeft = 0
+
 function page(axis, evt) {
   axis = axis.toUpperCase()
   return (evt.touches && evt.touches[0]['page' + axis]) || evt['page' + axis]
@@ -36,26 +38,23 @@ function Gallery(els) {
   this.width = width
   this.height = height
 
-  this.els.forEach(function(el, index) {
-    el.style.width = (width - 4) + 'px'
-    el.style.height = height + 'px'
-  })
   var that = this
 
   this.phys = physics(this.els)
-    .style({
-      translateX: function(p, i) {
-        return p.x + that.width * p.y * i + 2 + 'px'
-      },
-      scale: function(p) { return p.y }
-    })
-
-  this.phys.position(function(position) {
+  .style({
+    translateX: function(p, i) {
+      return p.x + that.width * p.y * i + 2 + 'px'
+    },
+    scale: function(p) { return p.y },
+    width: (width - 4) + 'px',
+    height: height + 'px'
+  })
+  .position(function(position) {
     that.scale = position.y
     that.x = position.x
   })
 
-  this.phys.updatePosition({ x: this.x, y: this.scale })
+  this.phys.setPosition({ x: this.x, y: this.scale })
 
   var touchEnabled = 'ontouchstart' in document.body
   var startEvent = touchEnabled ? 'touchstart' : 'mousedown'
@@ -75,31 +74,22 @@ Gallery.prototype.move = function(evt) {
     var angle = getAngle(this.initialX, this.initialY, page('x', evt), page('y', evt))
     this.intent = acceptableAngle('X', angle) ? 'horizontal' : 'vertical'
   }
-
   var y = page('y', evt)
   var scale = this.scale = (this.intent === 'vertical') ? this.scaleOffset * (y / this.initialY) : this.scale
   var x = this.x = page('x', evt) - this.xOffset * this.scale / this.scaleOffset
 
-  this.phys.updatePosition({ x: this.x, y: this.scale })
-
-  this.veloX.updatePosition(x)
-  this.veloY.updatePosition(scale)
+  this.phys.setPosition({ x: this.x, y: this.scale })
 }
 
 Gallery.prototype.start = function(evt) {
   //cancel any previously running animations
   this.phys.cancel()
   this.mousedown = true
-  this.veloX = new Velocity()
-  this.veloY = new Velocity()
 
   this.initialY = page('y', evt)
   this.initialX = page('x', evt)
   this.xOffset = this.initialX - this.x
   this.scaleOffset = this.scale
-
-  this.veloX.updatePosition(this.x)
-  this.veloY.updatePosition(this.scale)
 
   var target = evt.target
   for(var i = 0 ; (target = target.previousSibling) != null ; target.nodeType === 1 && i++) {}
@@ -109,7 +99,6 @@ Gallery.prototype.start = function(evt) {
 }
 
 Gallery.prototype.end = function(evt) {
-  console.log('running')
   if(this.intent === 'horizontal' && this.scale < .3)
     endScroll.call(this, evt)
   else if(this.intent === 'horizontal')
@@ -129,7 +118,7 @@ var springConst = { k: 100, b: 20 }
 function endPage(evt) {
   this.mousedown = false
 
-  var vel = Vector(this.veloX.getVelocity() || 0, this.veloY.getVelocity() || 0)
+  var vel = this.phys.getVelocity()
     , nextIndex = (vel.x < 0) ? this.chosenIndex + 1 : this.chosenIndex - 1
 
   nextIndex = Math.min(els.length - 1, Math.max(nextIndex, 0))
@@ -138,10 +127,11 @@ function endPage(evt) {
   return this.phys.spring(vel.x, { x: this.x, y: 1 }, { x: -width * nextIndex , y: 1 }, springConst)
 }
 
+
 function endScroll(evt) {
   this.mousedown = false
 
-  var vel = Vector(this.veloX.getVelocity() || 0, this.veloY.getVelocity() || 0)
+  var vel = this.phys.getVelocity()
 
   if(this.x < leftBoundry.x)
     return this.phys.spring(vel.x, { x: this.x, y: .25 }, leftBoundry, springConst)
@@ -157,7 +147,7 @@ function endScroll(evt) {
 function endZoom(evt) {
   this.mousedown = false
 
-  var vel = Vector(this.veloX.getVelocity() || 0, this.veloY.getVelocity() || 0)
+  var vel = this.phys.getVelocity()
     , springConst = { k: 150, b: 20 }
     , screenOffset = (this.x + this.xOffset * this.scale/this.scaleOffset) * .75
     , finalX = this.x * (.25 / this.scale) + screenOffset
@@ -168,5 +158,6 @@ function endZoom(evt) {
 
   return this.phys.spring(vel, { x: this.x, y: this.scale }, position, springConst)
 }
-
-var gallery = new Gallery(els)
+setTimeout(function() {
+  var gallery = new Gallery(els)
+}, 200)
