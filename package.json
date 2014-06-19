@@ -23,6 +23,7 @@
     "raf": "~2.0.1",
     "ayepromise": "~1.1.1",
     "micropromise": "~0.3.5",
-    "es6-promise": "~1.0.0"
+    "es6-promise": "~1.0.0",
+    "dom-delegate": "~2.0.0"
   }
 }

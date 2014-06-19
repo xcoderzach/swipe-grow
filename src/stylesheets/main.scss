@@ -1,6 +1,13 @@
 body {
   overflow: hidden;
 }
+
+* {
+  box-sizing: border-box;
+  font-family: "Helvetica Neue" sans-serif;
+  -webkit-user-select: none;
+}
+
 .thing {
   position: absolute;
   top: 0;
@@ -8,6 +15,47 @@ body {
   background-color: blue;
   -webkit-transform-origin: left top;
   -webkit-transform: translateZ(0) scale(1);
+}
+
+.thing.post:nth-child(n) {
+  background-color: white;
+}
+
+.thing h3 {
+  margin: 0;
+  padding: 0;
+  font-size: 20px;
+}
+
+.thing.post img {
+  -webkit-transform-origin: left top;
+  -webkit-transform: translateZ(0) scale(1);
+  width: 40px;
+  position: absolute;
+  top:0;
+  left:0;
+  padding: 4px;
+}
+
+.thing.post .preview {
+  -webkit-transform-origin: left top;
+  -webkit-transform: translateZ(0) scale(1);
+  position: absolute;
+  padding: 10px;
+  top:0;
+  left:0;
+  font-size: 23px;
+}
+
+.thing.post .full {
+  opacity: 0.00001;
+  -webkit-transform-origin: left top;
+  -webkit-transform: translateZ(0) scale(1);
+  position: absolute;
+  padding: 10px;
+  top:0;
+  left:0;
+  font-size: 16px;
 }
 
 .thing:nth-child(3n + 1) {
